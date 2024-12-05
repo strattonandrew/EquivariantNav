@@ -84,6 +84,7 @@ class DiagGaussian(nn.Module):
         self.logstd = AddBias(torch.zeros(num_outputs))
 
     def forward(self, x):
+        #print("X IN NON EQUI DIAG GAUSSIAN", x)
         action_mean = self.fc_mean(x)
 
         #  An ugly hack for my KFAC implementation.
@@ -92,7 +93,21 @@ class DiagGaussian(nn.Module):
             zeros = zeros.cuda()
 
         action_logstd = self.logstd(zeros)
+        #print("ACTION MEAN SHAPE NON EQUI: ", action_mean, action_logstd)
         return FixedNormal(action_mean, action_logstd.exp())
+
+class DiagGaussianEqui(nn.Module):
+    def __init__(self):
+        super(DiagGaussianEqui, self).__init__()
+        self.tanh = nn.Tanh()
+
+    def forward(self, x):
+        #print("X SHAPE: ", x.shape)
+        x = self.tanh(x)
+        action_mean = x[:,:2]
+        action_std = x[:,2:]
+        #print("ACTION MEAN SHAPE: ", action_mean)
+        return FixedNormal(action_mean, action_std.exp())
 
 
 class Bernoulli(nn.Module):

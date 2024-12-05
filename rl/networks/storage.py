@@ -70,12 +70,12 @@ class RolloutStorage(object):
     def insert(self, obs, recurrent_hidden_states, actions, action_log_probs,
                value_preds, rewards, masks, bad_masks):
 
-
         for key in self.obs:
             self.obs[key][self.step + 1].copy_(obs[key])
         for key in recurrent_hidden_states:
             self.recurrent_hidden_states[key][self.step + 1].copy_(recurrent_hidden_states[key])
 
+        #print("ACTION SIZES ", self.actions[self.step].shape, actions.shape)
         self.actions[self.step].copy_(actions)
         self.action_log_probs[self.step].copy_(action_log_probs)
         self.value_preds[self.step].copy_(value_preds)

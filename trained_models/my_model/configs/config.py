@@ -39,7 +39,7 @@ class Config(object):
     sim = BaseConfig()
     sim.circle_radius = 6 * np.sqrt(2)
     sim.arena_size = 6
-    sim.human_num = 20
+    sim.human_num = 5
     # actual human num in each timestep, in [human_num-human_num_range, human_num+human_num_range]
     sim.human_num_range = 0
     sim.predict_steps = 5
@@ -47,7 +47,7 @@ class Config(object):
     # 'truth': ground truth future traj (with info in robot's fov)
     # 'inferred': inferred future traj from GST network
     # 'none': no prediction
-    sim.predict_method = 'inferred'
+    sim.predict_method = 'none'
     # render the simulation during training or not
     sim.render = False
 
@@ -97,8 +97,9 @@ class Config(object):
     robot = BaseConfig()
     # whether robot is visible to humans (whether humans respond to the robot's motion)
     robot.visible = False
-    # For baseline: srnn; our method: selfAttn_merge_srnn
-    robot.policy = 'selfAttn_merge_srnn'
+    # For baseline: srnn; our method: selfAttn_merge_srnn, equi_srnn
+    robot.policy = 'equi_srnn'
+    #robot.policy = 'selfAttn_merge_srnn'
     robot.radius = 0.3
     robot.v_pref = 1
     robot.sensor = "coordinates"
@@ -110,7 +111,7 @@ class Config(object):
     # action space of the robot
     action_space = BaseConfig()
     # holonomic or unicycle
-    action_space.kinematics = "unicycle"
+    action_space.kinematics = "holonomic"
 
     # config for ORCA
     orca = BaseConfig()

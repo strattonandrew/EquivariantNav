@@ -48,3 +48,8 @@ class selfAttn_merge_SRNN(SRNN):
 	def __init__(self, config):
 		super().__init__(config)
 		self.name = 'selfAttn_merge_srnn'
+
+class equi_SRNN(SRNN):
+	def __init__(self, config):
+		super().__init__(config)
+		self.name = 'equi_srnn'

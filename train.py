@@ -15,6 +15,8 @@ from rl.networks.envs import make_vec_envs
 from rl.networks.model import Policy
 from rl.networks.storage import RolloutStorage
 
+import time
+
 
 from crowd_nav.configs.config import Config
 from crowd_sim import *
@@ -25,6 +27,8 @@ def main():
 	main function for training a robot policy network
 	"""
 	# read arguments
+	torch.set_printoptions(threshold=10_000)
+
 	algo_args = get_args()
 
 	# create a directory for saving the logs and weights
@@ -141,6 +145,8 @@ def main():
 		algo_args.num_env_steps) // algo_args.num_steps // algo_args.num_processes
 
 	# start the training loop
+	print("NUM UPDATES: ", num_updates)
+	curr_time = time.time()
 	for j in range(num_updates):
 		# schedule learning rate if needed
 		if algo_args.use_linear_lr_decay:
@@ -149,12 +155,15 @@ def main():
 				agent.optimizer.lr if algo_args.algo == "acktr" else algo_args.lr)
 
 		# step the environment for a few times
+		#print("NUM STEPS: ", algo_args.num_steps)
 		for step in range(algo_args.num_steps):
 			# Sample actions
 			with torch.no_grad():
 
 				rollouts_obs = {}
+				#print("ROLLOUT OBS KEYS: ", rollouts.obs.keys())
 				for key in rollouts.obs:
+					#print("KEY ", key, "SHAPE: ", rollouts.obs[key].shape)
 					rollouts_obs[key] = rollouts.obs[key][step]
 				rollouts_hidden_s = {}
 				for key in rollouts.recurrent_hidden_states:
@@ -215,6 +224,8 @@ def main():
 			save_path = os.path.join(algo_args.output_dir, 'checkpoints')
 			if not os.path.exists(save_path):
 				os.mkdir(save_path)
+			print("Average time per update: ", (time.time() - curr_time) / algo_args.save_interval)
+			curr_time = time.time()
 
 			torch.save(actor_critic.state_dict(), os.path.join(save_path, '%.5i'%j + ".pt"))
 

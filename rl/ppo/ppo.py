@@ -35,8 +35,10 @@ class PPO():
 
     def update(self, rollouts):
         advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+        #print("ADVANTAGES 1 ", advantages)
         advantages = (advantages - advantages.mean()) / (
             advantages.std() + 1e-5)
+        #print("ADVANTAGES 2 ", advantages)
 
         value_loss_epoch = 0
         action_loss_epoch = 0
@@ -61,11 +63,16 @@ class PPO():
                     obs_batch, recurrent_hidden_states_batch, masks_batch,
                     actions_batch)
 
+                #print("PROBABILITIES: ", old_action_log_probs_batch, action_log_probs)
+
                 ratio = torch.exp(action_log_probs -
                                   old_action_log_probs_batch)
                 surr1 = ratio * adv_targ
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_param,
                                     1.0 + self.clip_param) * adv_targ
+                #print("SURRS ", surr1.shape, surr2.shape, ratio.shape, adv_targ.shape)
+                #print("SURR 1 ", surr1.T, " SURR 2 ", surr2.T, " RATIO ", ratio.T, " ADV TARG ", adv_targ.T, adv_targ.mean())
+                #print("LAST OPERATION ", -torch.min(surr1, surr2).T)
                 action_loss = -torch.min(surr1, surr2).mean()
 
                 if self.use_clipped_value_loss:
@@ -78,6 +85,9 @@ class PPO():
                                                  value_losses_clipped).mean()
                 else:
                     value_loss = 0.5 * (return_batch - values).pow(2).mean()
+
+                #print("VALUE LOSS ", value_loss, self.value_loss_coef)
+                #print("ACTION LOSS ", action_loss)
 
                 self.optimizer.zero_grad()
                 total_loss=value_loss * self.value_loss_coef + action_loss - dist_entropy * self.entropy_coef

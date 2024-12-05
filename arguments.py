@@ -49,7 +49,7 @@ def get_args():
     parser.add_argument(
         '--num-processes',
         type=int,
-        default=16,
+        default=4,
         help='how many training processes to use (default: 16)')
 
     parser.add_argument(
@@ -65,7 +65,7 @@ def get_args():
     parser.add_argument(
         '--recurrent-policy',
         action='store_true',
-        default=True,
+        default=False,
         help='use a recurrent policy')
 
     parser.add_argument(
@@ -86,14 +86,14 @@ def get_args():
     parser.add_argument(
         '--entropy-coef',
         type=float,
-        default=0.0,
+        default=0.00,
         help='entropy term coefficient (default: 0.01)')
     parser.add_argument(
-        '--lr', type=float, default=4e-5, help='learning rate (default: 7e-4)')
+        '--lr', type=float, default=1e-5, help='learning rate (default: 7e-4)')
     parser.add_argument(
         '--eps',
         type=float,
-        default=1e-5,
+        default=4e-5,
         help='RMSprop optimizer epsilon (default: 1e-5)')
     parser.add_argument(
         '--alpha',
@@ -120,7 +120,7 @@ def get_args():
     parser.add_argument(
         '--use-linear-lr-decay',
         action='store_true',
-        default=False,
+        default=True,
         help='use a linear schedule on the learning rate')
     parser.add_argument(
         '--algo', default='ppo', help='algorithm to use: a2c | ppo | acktr')
@@ -200,6 +200,13 @@ def get_args():
         '--env-name',
         default='CrowdSimPredRealGST-v0',
         help='name of the environment')
+
+    parser.add_argument(
+        '--use_separate_attn',
+        type=bool,
+        default=False,
+        help='Attention size'
+    )
 
 
     # sort all humans and squeeze them to the front or not

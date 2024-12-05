@@ -377,6 +377,7 @@ class selfAttn_merge_SRNN(nn.Module):
             self.args.sort_humans = True
         if self.args.sort_humans:
             detected_human_num = inputs['detected_human_num'].squeeze(-1).cpu().int()
+            #print("DETECTE DHUMAN NUMBER: ", detected_human_num)
         else:
             human_masks = reshapeT(inputs['visible_masks'], seq_length, nenv).float() # [seq_len, nenv, max_human_num]
             # if no human is detected (human_masks are all False, set the first human to True)
@@ -386,6 +387,13 @@ class selfAttn_merge_SRNN(nn.Module):
         hidden_states_node_RNNs = reshapeT(rnn_hxs['human_node_rnn'], 1, nenv)
         masks = reshapeT(masks, seq_length, nenv)
 
+        # print("IN FORWARD RESHAPES: ")
+        # print("ROBOT NODE: ", robot_node.shape)
+        # print("TEMPORAL EDGES: ", temporal_edges.shape)
+        # print("SPATIAL EDGES: ", spatial_edges.shape)
+        # print("HIDDEN NODE: ", hidden_states_node_RNNs.shape)
+        # print("MASKS: ", masks.shape)
+
 
         if self.args.no_cuda:
             all_hidden_states_edge_RNNs = Variable(
@@ -393,37 +401,58 @@ class selfAttn_merge_SRNN(nn.Module):
         else:
             all_hidden_states_edge_RNNs = Variable(
                 torch.zeros(1, nenv, 1+self.human_num, rnn_hxs['human_human_edge_rnn'].size()[-1]).cuda())
+            #print("ALL HIDDEN STATES EDGE ", all_hidden_states_edge_RNNs.shape, all_hidden_states_edge_RNNs)
 
         robot_states = torch.cat((temporal_edges, robot_node), dim=-1)
+        #print("ROBOT STATES SHAPE: ", robot_states.shape)
         robot_states = self.robot_linear(robot_states)
-
+        #print("ROBOT STATES AFTER LINEAR: ", robot_states.shape)
 
         # attention modules
         if self.args.sort_humans:
+            #print("SORT HUMANS TRUE")
             # human-human attention
             if self.args.use_self_attn:
-                spatial_attn_out=self.spatial_attn(spatial_edges, detected_human_num).view(seq_length, nenv, self.human_num, -1)
+                #print("USING SELF ATTN")
+                #spatial_attn_out=self.spatial_attn(spatial_edges, detected_human_num).view(seq_length, nenv, self.human_num, -1)
+                spatial_attn_out_int=self.spatial_attn(spatial_edges, detected_human_num)
+                #print("SPATIAL ATTN OUT INT SHAPE: ", spatial_attn_out_int.shape)
+                spatial_attn_out=spatial_attn_out_int.view(seq_length, nenv, self.human_num, -1)
+                #print("SPATIAL ATTN OUT SHAPE: ", spatial_attn_out.shape)
             else:
+                #print("NOT USING SELF ATTN")
                 spatial_attn_out = spatial_edges
             output_spatial = self.spatial_linear(spatial_attn_out)
+            #print("OUTPUT SPATIAL SHAPE: ", output_spatial.shape)
 
             # robot-human attention
             hidden_attn_weighted, _ = self.attn(robot_states, output_spatial, detected_human_num)
         else:
+            #print("SORT HUMANS FALSE")
             # human-human attention
             if self.args.use_self_attn:
-                spatial_attn_out = self.spatial_attn(spatial_edges, human_masks).view(seq_length, nenv, self.human_num, -1)
+                #print("USING SELF ATTN")
+                #spatial_attn_out = self.spatial_attn(spatial_edges, human_masks).view(seq_length, nenv, self.human_num, -1)
+                spatial_attn_out_int = self.spatial_attn(spatial_edges, human_masks)
+                #print("SPATIAL ATTN OUT INT SHAPE: ", spatial_attn_out_int.shape)
+                spatial_attn_out = spatial_attn_out_int.view(seq_length, nenv, self.human_num, -1)
+                #print("SPATIAL ATTN OUT SHAPE: ", spatial_attn_out.shape)
             else:
+                #print("NOT USING SELF ATTN")
                 spatial_attn_out = spatial_edges
             output_spatial = self.spatial_linear(spatial_attn_out)
+            #print("OUTPUT SPATIAL SHAPE: ", output_spatial.shape)
 
             # robot-human attention
             hidden_attn_weighted, _ = self.attn(robot_states, output_spatial, human_masks)
+            #print("HIDDEN ATTN WEIGHTED SHAPE", hidden_attn_weighted.shape)
 
 
         # Do a forward pass through GRU
         outputs, h_nodes \
             = self.humanNodeRNN(robot_states, hidden_attn_weighted, hidden_states_node_RNNs, masks)
+
+        #print("OUTPUTS ", outputs.shape, h_nodes.shape, outputs[:, :, 0, :].shape)
 
 
         # Update the hidden and cell states
@@ -431,6 +460,7 @@ class selfAttn_merge_SRNN(nn.Module):
         outputs_return = outputs
 
         rnn_hxs['human_node_rnn'] = all_hidden_states_node_RNNs
+        #print("ALL HIDDEN STATES EDGE END ", all_hidden_states_edge_RNNs.shape, all_hidden_states_edge_RNNs)
         rnn_hxs['human_human_edge_rnn'] = all_hidden_states_edge_RNNs
 
 
@@ -440,13 +470,25 @@ class selfAttn_merge_SRNN(nn.Module):
         hidden_critic = self.critic(x)
         hidden_actor = self.actor(x)
 
+        #print("HIDDEN CRITIC: ", hidden_critic.shape)
+        #print("HIDDEN ACTOR: ", hidden_actor.shape)
+
         for key in rnn_hxs:
             rnn_hxs[key] = rnn_hxs[key].squeeze(0)
 
         if infer:
+            #print("INFER")
             return self.critic_linear(hidden_critic).squeeze(0), hidden_actor.squeeze(0), rnn_hxs
         else:
-            return self.critic_linear(hidden_critic).view(-1, 1), hidden_actor.view(-1, self.output_size), rnn_hxs
+            #print("NOT INFER")
+            cl = self.critic_linear(hidden_critic)
+            #print("CL ", cl.shape)
+            clv = cl.view(-1, 1)
+            #print("CLV: ", clv.shape)
+            hav = hidden_actor.view(-1, self.output_size)
+            #print("HAV SHAPE: ", hav.shape)
+            #return self.critic_linear(hidden_critic).view(-1, 1), hidden_actor.view(-1, self.output_size), rnn_hxs
+            return clv, hav, rnn_hxs
 
 
 def reshapeT(T, seq_length, nenv):

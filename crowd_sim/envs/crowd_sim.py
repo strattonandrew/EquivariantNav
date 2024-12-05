@@ -255,7 +255,8 @@ class CrowdSim(gym.Env):
 
             else:
                 if reset:
-                    humanS = np.array([15., 15., 0., 0., 0.3])
+                    #humanS = np.array([15., 15., 0., 0., 0.3])
+                    humanS = np.array(self.humans[i].get_observable_state_list())
                     self.last_human_states[i, :] = humanS
 
                 else:
@@ -567,7 +568,8 @@ class CrowdSim(gym.Env):
                 num_humans_in_view = num_humans_in_view + 1
                 human_ids.append(True)
             else:
-                human_ids.append(False)
+                #human_ids.append(False)
+                human_ids.append(True)
 
         return humans_in_view, num_humans_in_view, human_ids
 
@@ -706,7 +708,6 @@ class CrowdSim(gym.Env):
         """
         Compute actions for all agents, detect collision, update environment and return (ob, reward, done, info)
         """
-
         # clip the action to obey robot's constraint
         action = self.robot.policy.clip_action(action, self.robot.v_pref)
 

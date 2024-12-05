@@ -79,9 +79,11 @@ class Agent(object):
         return ObservableState(self.px, self.py, self.vx, self.vy, self.radius)
 
     def get_observable_state_list(self):
+        #print("getting observable state with velocity")
         return [self.px, self.py, self.vx, self.vy, self.radius]
 
     def get_observable_state_list_noV(self):
+        #print("getting observable state no velocity")
         return [self.px, self.py, self.radius]
 
     def get_next_observable_state(self, action):
@@ -108,6 +110,7 @@ class Agent(object):
         # return [self.px, self.py, self.radius, self.gx, self.gy, self.v_pref]
 
     def get_position(self):
+        #print("getting agent position")
         return self.px, self.py
 
     def set_position(self, position):

@@ -6,6 +6,8 @@ import copy
 
 from rl.networks.network_utils import init
 
+from lie_conv.lieGroups import SE3, SE2, SO3, T, Trivial, SE2_canonical
+
 
 class RNNBase(nn.Module):
     """

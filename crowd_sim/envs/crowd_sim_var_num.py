@@ -42,10 +42,10 @@ class CrowdSimVarNum(CrowdSim):
 
         d={}
         # robot node: px, py, r, gx, gy, v_pref, theta
-        d['robot_node'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,7,), dtype = np.float32)
+        d['robot_node'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,9,), dtype = np.float32)
         # only consider all temporal edges (human_num+1) and spatial edges pointing to robot (human_num)
         d['temporal_edges'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1, 2,), dtype=np.float32)
-        d['spatial_edges'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.max_human_num, 2), dtype=np.float32)
+        d['spatial_edges'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.max_human_num, 5), dtype=np.float32)
         # number of humans detected at each timestep
         d['detected_human_num'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1, ), dtype=np.float32)
         # whether each human is visible to robot (ordered by human ID, should not be sorted)
@@ -237,23 +237,25 @@ class CrowdSimVarNum(CrowdSim):
         # nodes
         visible_humans, num_visibles, self.human_visibility = self.get_num_human_in_fov()
 
-        ob['robot_node'] = self.robot.get_full_state_list_noV()
+        #ob['robot_node'] = self.robot.get_full_state_list_noV()
+        ob['robot_node'] = self.robot.get_full_state_list()
 
         prev_human_pos = copy.deepcopy(self.last_human_states)
+        #print("CALLING")
         self.update_last_human_states(self.human_visibility, reset=reset)
 
         # edges
         ob['temporal_edges'] = np.array([self.robot.vx, self.robot.vy])
 
         # ([relative px, relative py, disp_x, disp_y], human id)
-        all_spatial_edges = np.ones((self.max_human_num, 2)) * np.inf
+        all_spatial_edges = np.ones((self.max_human_num, 5)) * np.inf
 
         for i in range(self.human_num):
             if self.human_visibility[i]:
                 # vector pointing from human i to robot
                 relative_pos = np.array(
-                    [self.last_human_states[i, 0] - self.robot.px, self.last_human_states[i, 1] - self.robot.py])
-                all_spatial_edges[self.humans[i].id, :2] = relative_pos
+                    [self.last_human_states[i, 0] - self.robot.px, self.last_human_states[i, 1] - self.robot.py, self.last_human_states[i, 2], self.last_human_states[i, 3], self.last_human_states[i, 4]])
+                all_spatial_edges[self.humans[i].id, :5] = relative_pos
 
         ob['visible_masks'] = np.zeros(self.max_human_num, dtype=np.bool)
         # sort all humans by distance (invisible humans will be in the end automatically)
