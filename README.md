@@ -1,23 +1,5 @@
-# CrowdNav++
-This repository contains the codes for our paper titled "Intention Aware Robot Crowd Navigation with Attention-Based Interaction Graph" in ICRA 2023. 
-For more details, please refer to the [project website](https://sites.google.com/view/intention-aware-crowdnav/home) and [arXiv preprint](https://arxiv.org/abs/2203.01821).
-For experiment demonstrations, please refer to the [youtube video](https://www.youtube.com/watch?v=nxpxhF019VA).
-
-**[News]**
-- Please check out our open-sourced sim2real tutorial [here](https://github.com/Shuijing725/CrowdNav_Sim2Real_Turtlebot)
-- Please check out my curated paper list for robot social navigation [here](https://github.com/Shuijing725/awesome-robot-social-navigation) (It is under active development) 
-
-## Abstract
-We study the problem of safe and intention-aware robot navigation in dense and interactive crowds. 
-Most previous reinforcement learning (RL) based methods fail to consider different types of interactions among all agents or ignore the intentions of people, which results in performance degradation. 
-In this paper, we propose a novel recurrent graph neural network with attention mechanisms to capture heterogeneous interactions among agents through space and time. 
-To encourage longsighted robot behaviors, we infer the intentions of dynamic agents by predicting their future trajectories for several timesteps. 
-The predictions are incorporated into a model-free RL framework to prevent the robot from intruding into the intended paths of other agents. 
-We demonstrate that our method enables the robot to achieve good navigation performance and non-invasiveness in challenging crowd navigation scenarios. We successfully transfer the policy learned in simulation to a real-world TurtleBot 2i.
-
-<p align="center">
-<img src="/figures/open.png" width="450" />
-</p>
+# Symmetry-Exploiting Reinforcement Learning for Social Robot Navigation
+This repository contains the code for my course project for Computational Symmetry in AI and Robotics.
 
 ## Setup
 1. In a conda environment or virtual environment with Python 3.x, install the required python package
