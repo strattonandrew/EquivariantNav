@@ -86,6 +86,7 @@ def main():
 
 
 	# Create a wrapped, monitored VecEnv
+	print("TRAIN ARGS ", env_name, algo_args.seed, algo_args.num_processes, algo_args.gamma, None, device, False, env_config, ax, config.env.use_wrapper)
 	envs = make_vec_envs(env_name, algo_args.seed, algo_args.num_processes,
 						 algo_args.gamma, None, device, False, config=env_config, ax=ax, pretext_wrapper=config.env.use_wrapper)
 

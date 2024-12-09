@@ -25,6 +25,7 @@ class CrowdSimVarNumCollect(CrowdSimVarNum):
 
 
     def set_robot(self, robot):
+        print("THE OTHER WRONG ONE")
         self.robot = robot
 
         # set observation space and action space

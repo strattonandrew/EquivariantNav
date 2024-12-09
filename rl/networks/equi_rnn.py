@@ -11,39 +11,57 @@ from .srnn_model import *
 from escnn import gspaces
 from escnn import nn as enn
 
+from torch_geometric.nn import global_mean_pool
+
 import escnn.nn.init as init
 
-WIDTH = 2.
-N_RINGS = 3
+WIDTH = 5.
+N_RINGS = 6
 DEEP = False
 POOL = True
+ACTION_POOL = False
+NORM = True
+DEFAULT_ACTION = False
 
-NARROW = 8
-MID = 16
-WIDE = 32
+NARROW = 64
+MID = 128
+WIDE = 256
 
 def construct_fc_edge_index(seq_length=1, nenv=16, human_num=20):
     num_edges_per_graph = (human_num + 1) * nenv
     prod = torch.cartesian_prod(torch.arange(human_num+1), torch.arange(human_num+1))
     prod_list = [prod]
+
+    batch = torch.zeros(human_num+1, dtype=torch.int64)
+    batch_list = [batch]
+
     for i in range(1, nenv):
         #print(i)
         prod_add = prod + i * (human_num+1)
         #print(prod_add)
         prod_list.append(prod_add)
+        batch_add = batch + i
+        batch_list.append(batch_add)
     prod = torch.cat(prod_list, dim=0)
     prod = prod.T
 
+    batch = torch.cat(batch_list, dim=0)
+
     seq_list = []
+    batch_seq_list = []
     for i in range(seq_length):
         prod_add = prod + i * (nenv * (human_num+1))
         seq_list.append(prod_add)
+
+        batch_add = batch + i * nenv
+        batch_seq_list.append(batch_add)
     prod_seq = torch.cat(seq_list, dim=1)
+    batch_seq = torch.cat(batch_seq_list, dim=0)
     #prod_seq = torch.tile(prod, (1, seq_length))
     #print("PROD: ", prod.shape, prod_seq.shape)
     print("PROD SEQ FC ", prod_seq.shape)
-    print(prod_seq)
-    return prod_seq
+    print(prod_seq, batch_seq)
+    return [prod_seq.to('cuda:0'), batch_seq.to('cuda:0')]
 
 def construct_disconnected_edge_index(seq_length=1, nenv=16, human_num=20):
     num_edges_per_graph = human_num + 1
@@ -448,14 +466,18 @@ class EquiActor(nn.Module):
             self.deep_act2 = enn.ReLU(self.hidden_field)
         else:
             self.inter_conv = enn.R2PointConv(self.input_field, self.hidden_field, sigma=None, width=WIDTH, n_rings=N_RINGS, frequencies_cutoff=None, bias=True)
+            self.batch_norm = enn.IIDBatchNorm1d(self.hidden_field)
             self.act = enn.ReLU(self.hidden_field)
         self.action_conv = enn.R2PointConv(self.hidden_field, self.action_field, sigma=None, width=WIDTH, n_rings=N_RINGS, frequencies_cutoff=None, bias=True)
+        self.batch_norm_action = enn.IIDBatchNorm1d(self.action_field)
         init.deltaorthonormal_init(self.action_conv.weights.data, self.action_conv.basissampler)
 
         self.tanh = nn.Tanh()
 
     def forward(self, input_state, edge_index):
         ico = self.inter_conv(input_state, edge_index)
+        if NORM:
+            ico = self.batch_norm(ico)
         iao = self.act(ico)
 
         if DEEP:
@@ -463,9 +485,14 @@ class EquiActor(nn.Module):
             da1 = self.deep_act1(dc1)
             dc2 = self.deep_conv2(da1, edge_index)
             da2 = self.deep_act2(dc2)
+            if DEFAULT_ACTION:
+                return da2
             action = self.action_conv(da2, edge_index)
         else:
+            if DEFAULT_ACTION:
+                return iao
             action = self.action_conv(iao, edge_index)
+            action = self.batch_norm_action(action)
         return action
 
 class EquiCritic(nn.Module):
@@ -504,14 +531,18 @@ class EquiCritic(nn.Module):
             self.deep_act2 = enn.ReLU(self.hidden_field)
         else:
             self.inter_conv = enn.R2PointConv(self.input_field, self.hidden_field, sigma=None, width=WIDTH, n_rings=N_RINGS, frequencies_cutoff=None, bias=True)
+            self.batch_norm = enn.IIDBatchNorm1d(self.hidden_field)
             self.act = enn.ReLU(self.hidden_field)
         self.value_conv = enn.R2PointConv(self.hidden_field, self.value_field, sigma=None, width=WIDTH, n_rings=N_RINGS, frequencies_cutoff=None, bias=True)
         #self.pool = enn.PointwiseAvgPool2D(self.value_field, kernel_size=21)
         self.pool = enn.GroupPooling(self.value_pool_field)
         self.pool_conv = enn.R2PointConv(self.hidden_field, self.value_pool_field, sigma=None, width=WIDTH, n_rings=N_RINGS, frequencies_cutoff=None, bias=True)
+        self.pool_batch_norm = enn.IIDBatchNorm1d(self.value_pool_field)
 
     def forward(self, input_state, edge_index):
         ico = self.inter_conv(input_state, edge_index)
+        if POOL:
+            ico = self.batch_norm(ico)
         iao = self.act(ico)
 
         if DEEP:
@@ -527,6 +558,7 @@ class EquiCritic(nn.Module):
         else:
             if POOL:
                 vp = self.pool_conv(iao, edge_index)
+                vp = self.pool_batch_norm(vp)
                 #print("VALUE PRE ", iao.tensor.shape, vp.tensor.shape)
                 value = self.pool(vp)
                 #print("VALUE ", value.tensor.shape)
@@ -559,10 +591,13 @@ class EquiRobotEncoder(nn.Module):
         self.hidden_field = hidden_field
 
         self.conv = enn.R2PointConv(self.in_type_robot, self.hidden_field, sigma=None, width=WIDTH, n_rings=N_RINGS, frequencies_cutoff=None, bias=True)
+        self.batch_norm = enn.IIDBatchNorm1d(self.hidden_field)
         self.act = enn.ReLU(self.hidden_field)
 
     def forward(self, robot_state, edge_index):
         co = self.conv(robot_state, edge_index)
+        if NORM:
+            co = self.batch_norm(co)
         ao = self.act(co)
         return ao
 
@@ -585,10 +620,13 @@ class EquiHumanEncoder(nn.Module):
         self.hidden_field = hidden_field
 
         self.conv = enn.R2PointConv(self.in_type_human, self.hidden_field, sigma=None, width=WIDTH, n_rings=N_RINGS, frequencies_cutoff=None, bias=True)
+        self.batch_norm = enn.IIDBatchNorm1d(self.hidden_field)
         self.act = enn.ReLU(self.hidden_field)
 
     def forward(self, human_state, edge_index):
         co = self.conv(human_state, edge_index)
+        if NORM:
+            co = self.batch_norm(co)
         ao = self.act(co)
         return ao
 
@@ -695,16 +733,19 @@ class equi_SRNN(nn.Module):
         if seq_length in self.edge_indices:
             if nenv in self.edge_indices[seq_length]:
                 #print("HIT 1")
-                edge_index = self.edge_indices[seq_length][nenv]
+                edge_index = self.edge_indices[seq_length][nenv][0]
+                batch_index = self.edge_indices[seq_length][nenv][1]
             else:
                 print("MISS 1")
-                self.edge_indices[seq_length][nenv] = construct_fc_edge_index(seq_length, nenv, self.human_num).to('cuda:0')
-                edge_index = self.edge_indices[seq_length][nenv]
+                self.edge_indices[seq_length][nenv] = construct_fc_edge_index(seq_length, nenv, self.human_num)
+                edge_index = self.edge_indices[seq_length][nenv][0]
+                batch_index = self.edge_indices[seq_length][nenv][1]
         else:
             print("MISS 2")
             self.edge_indices[seq_length] = {}
-            self.edge_indices[seq_length][nenv] = construct_fc_edge_index(seq_length, nenv, self.human_num).to('cuda:0')
-            edge_index = self.edge_indices[seq_length][nenv]
+            self.edge_indices[seq_length][nenv] = construct_fc_edge_index(seq_length, nenv, self.human_num)
+            edge_index = self.edge_indices[seq_length][nenv][0]
+            batch_index = self.edge_indices[seq_length][nenv][1]
 
         if seq_length in self.disconnected_edge_indices:
             if nenv in self.disconnected_edge_indices[seq_length]:
@@ -730,9 +771,6 @@ class equi_SRNN(nn.Module):
         robot_node = reshapeT(inputs['robot_node'], seq_length, nenv)
         temporal_edges = reshapeT(inputs['temporal_edges'], seq_length, nenv)
         spatial_edges = reshapeT(inputs['spatial_edges'], seq_length, nenv)
-
-        print("robot node ", robot_node)
-        print("spatial edges", spatial_edges)
 
         # to prevent errors in old models that does not have sort_humans argument
         if not hasattr(self.args, 'sort_humans'):
@@ -765,17 +803,9 @@ class equi_SRNN(nn.Module):
         output_spatial = spatial_edges
         #print("Output spatial and robot node ", output_spatial.shape, robot_node[0,0,0,:])
 
-        print("edge indices:")
-        print(edge_index)
-        print("robot")
-        print(disconnected_edge_index_robot)
-        print("human")
-        print(disconnected_edge_index_human)
-
         all_states = torch.cat((output_spatial[:,:,:,:2], robot_node[:,:,:,:2]), dim=-2)
         #print("ALL STATES SHAPE: ", all_states.shape, all_states)
         all_states_batch = all_states.view(all_states.shape[0] * all_states.shape[1] * all_states.shape[2], all_states.shape[-1])
-        print("all_states_batch shape", all_states_batch.shape, all_states_batch)
         #all_radii_batch = torch.full((all_states_batch.shape[0], 1), 0.3).to('cuda:0')
         #print("all radii batch ", all_radii_batch.shape)
         #all_radii_batch = self.all_radii[:all_states_batch.shape[0]]
@@ -789,8 +819,6 @@ class equi_SRNN(nn.Module):
 
         robot_node_batch = robot_node.view(robot_node.shape[0] * robot_node.shape[1] * robot_node.shape[2], robot_node.shape[-1])
         robot_state_input = self.in_type_robot(robot_node_batch[:,2:], robot_node_batch[:,:2])
-        print("robot node batch ", robot_node_batch.shape, robot_node_batch)
-        print("robot state input ", robot_state_input.shape, robot_state_input)
 
         output_spatial_batch = output_spatial.view(output_spatial.shape[0] * output_spatial.shape[1] * output_spatial.shape[2], output_spatial.shape[-1])
         #self.human_radii_batch = torch.full((output_spatial_batch.shape[0], 1), 0.3).to('cuda:0')
@@ -812,31 +840,15 @@ class equi_SRNN(nn.Module):
         robot_encoding = self.equi_robot_encoder(robot_state_input, disconnected_edge_index_robot)
         human_encoding = self.equi_human_encoder(human_state_input, disconnected_edge_index_human)
 
-        print("robot encoding")
-        print(robot_encoding)
-        print("human encoding")
-        print(human_encoding)
-
         #print("Robot and human encodings ", robot_encoding.tensor.shape, human_encoding.tensor.shape)
 
         robot_encoding_batch = robot_encoding.tensor.view(robot_node.shape[0], robot_node.shape[1], robot_node.shape[2], robot_encoding.shape[-1])
         output_encoding_batch = human_encoding.tensor.view(output_spatial.shape[0], output_spatial.shape[1], output_spatial.shape[2], human_encoding.shape[-1])
         combined_encoding_batch = torch.cat((output_encoding_batch, robot_encoding_batch), dim=-2)
 
-        print("robot encoding batch")
-        print(robot_encoding_batch)
-        print("output encoding batch")
-        print(output_encoding_batch)
-        print("combined encoding batch")
-        print(combined_encoding_batch)
-
         #print("Robot and human encoding batch ", robot_encoding_batch.shape, output_encoding_batch.shape, combined_encoding_batch.shape)
 
         combined_encoding = combined_encoding_batch.view(combined_encoding_batch.shape[0] * combined_encoding_batch.shape[1] * combined_encoding_batch.shape[2], combined_encoding_batch.shape[-1])
-        print("combined encoding")
-        print(combined_encoding)
-        print("combined encoding ", combined_encoding.shape)
-
         rh_encoding = self.encoding_field(combined_encoding, all_states_batch)
 
         #rh_encoding = self.equi_rh_feature_encoder(robot_node, output_spatial, edge_index)
@@ -855,20 +867,70 @@ class equi_SRNN(nn.Module):
         hidden_critic = self.equi_critic(rh_encoding, edge_index)
         hidden_actor = self.equi_actor(rh_encoding, edge_index)
 
-        print("hidden actor shape ", hidden_actor.shape, hidden_actor)
-
-        action_indices = torch.arange(start=self.human_num, end=(seq_length * nenv * (self.human_num+1)), step=(self.human_num+1)).to('cuda:0')
-        print(action_indices)
-        robot_actions = hidden_actor[action_indices]
-        print("robot actions ", robot_actions)
-        robot_values = hidden_critic[action_indices]
-
-        #print("ROBOT ACTIONS SHAPE ", robot_actions.shape, robot_values.shape)
-
         for key in rnn_hxs:
             rnn_hxs[key] = rnn_hxs[key].squeeze(0)
+
+        if DEFAULT_ACTION:
+            if ACTION_POOL:
+                values = global_mean_pool(hidden_critic.tensor, batch_index)
+                values_reshape = values.view(nenv * seq_length, values.shape[-1])
+                actions = global_mean_pool(hidden_actor.tensor, batch_index)
+                actions_reshape = actions.view(nenv * seq_length, actions.shape[-1])
+                return values_reshape, actions_reshape, rnn_hxs
+            else:
+                action_indices = torch.arange(start=self.human_num, end=(seq_length * nenv * (self.human_num+1)), step=(self.human_num+1)).to('cuda:0')
+                robot_actions = hidden_actor[action_indices].tensor
+                robot_values = hidden_critic[action_indices].tensor
+                return robot_values, robot_actions, rnn_hxs
+
+        if ACTION_POOL:
+            robot_actions = global_mean_pool(hidden_actor.tensor, batch_index)
+            robot_values = global_mean_pool(hidden_critic.tensor, batch_index)
+        else:
+            action_indices = torch.arange(start=self.human_num, end=(seq_length * nenv * (self.human_num+1)), step=(self.human_num+1)).to('cuda:0')
+            robot_actions = hidden_actor[action_indices].tensor
+            robot_values = hidden_critic[action_indices].tensor
+
+        # if seq_length > 1:
+        #     print("SEQ LENGTH ", seq_length, nenv)
+        #     print("edge indices:")
+        #     print(edge_index)
+        #     print("robot")
+        #     print(disconnected_edge_index_robot)
+        #     print("human")
+        #     print(disconnected_edge_index_human)
+
+        #     print("robot node ", robot_node)
+        #     print("spatial edges", spatial_edges)
+
+        #     print("all_states_batch shape", all_states_batch.shape, all_states_batch)
+
+        #     print("robot node batch ", robot_node_batch.shape, robot_node_batch)
+        #     print("robot state input ", robot_state_input.shape, robot_state_input)
+
+        #     print("robot encoding")
+        #     print(robot_encoding)
+        #     print("human encoding")
+        #     print(human_encoding)
+
+            # print("robot encoding batch")
+            # print(robot_encoding_batch)
+            # print("output encoding batch")
+            # print(output_encoding_batch)
+            # print("combined encoding batch")
+            # print(combined_encoding_batch)
+
+            # print("combined encoding")
+            # print(combined_encoding)
+            # print("combined encoding ", combined_encoding.shape)
+
+            # print("hidden actor shape ", hidden_actor.shape, hidden_actor)
+            # print(action_indices)
+            # print("robot actions ", robot_actions)
+
+            # print("ROBOT ACTIONS SHAPE ", robot_actions.shape, robot_values.shape)
 
         #if infer:
             #cl = self.equi_critic_linear(hidden_critic).squeeze(0)
             #cl = hidden_critic.squeeze(0)
-        return robot_values.tensor, robot_actions.tensor, rnn_hxs
+        return robot_values, robot_actions, rnn_hxs

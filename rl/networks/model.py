@@ -5,7 +5,7 @@ import torch.nn as nn
 from rl.networks.distributions import Bernoulli, Categorical, DiagGaussian, DiagGaussianEqui
 from .srnn_model import SRNN
 from .selfAttn_srnn_temp_node import selfAttn_merge_SRNN
-from .equi_rnn import equi_SRNN
+from .equi_rnn import equi_SRNN, DEFAULT_ACTION
 
 class Flatten(nn.Module):
     def forward(self, x):
@@ -40,12 +40,12 @@ class Policy(nn.Module):
             num_outputs = action_space.n
             self.dist = Categorical(self.base.output_size, num_outputs)
         elif action_space.__class__.__name__ == "Box":
-            if use_equi:
+            if use_equi and not DEFAULT_ACTION:
                 #print("USING EQUI DIAG GAUSSIAN")
                 self.dist = DiagGaussianEqui()
             else:
                 num_outputs = action_space.shape[0]
-                #print("BOX NUM OUTPUTS ", num_outputs)
+                print("BOX NUM OUTPUTS ", num_outputs)
                 self.dist = DiagGaussian(self.base.output_size, num_outputs)
         elif action_space.__class__.__name__ == "MultiBinary":
             num_outputs = action_space.shape[0]

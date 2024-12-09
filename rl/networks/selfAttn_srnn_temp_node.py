@@ -470,8 +470,8 @@ class selfAttn_merge_SRNN(nn.Module):
         hidden_critic = self.critic(x)
         hidden_actor = self.actor(x)
 
-        #print("HIDDEN CRITIC: ", hidden_critic.shape)
-        #print("HIDDEN ACTOR: ", hidden_actor.shape)
+        print("HIDDEN CRITIC: ", hidden_critic.shape, nenv, seq_length)
+        print("HIDDEN ACTOR: ", hidden_actor.shape)
 
         for key in rnn_hxs:
             rnn_hxs[key] = rnn_hxs[key].squeeze(0)
@@ -480,13 +480,13 @@ class selfAttn_merge_SRNN(nn.Module):
             #print("INFER")
             return self.critic_linear(hidden_critic).squeeze(0), hidden_actor.squeeze(0), rnn_hxs
         else:
-            #print("NOT INFER")
+            print("NOT INFER")
             cl = self.critic_linear(hidden_critic)
-            #print("CL ", cl.shape)
+            print("CL ", cl.shape)
             clv = cl.view(-1, 1)
-            #print("CLV: ", clv.shape)
+            print("CLV: ", clv.shape)
             hav = hidden_actor.view(-1, self.output_size)
-            #print("HAV SHAPE: ", hav.shape)
+            print("HAV SHAPE: ", hav.shape)
             #return self.critic_linear(hidden_critic).view(-1, 1), hidden_actor.view(-1, self.output_size), rnn_hxs
             return clv, hav, rnn_hxs
 

@@ -49,7 +49,7 @@ def get_args():
     parser.add_argument(
         '--num-processes',
         type=int,
-        default=4,
+        default=16,
         help='how many training processes to use (default: 16)')
 
     parser.add_argument(
@@ -89,7 +89,7 @@ def get_args():
         default=0.00,
         help='entropy term coefficient (default: 0.01)')
     parser.add_argument(
-        '--lr', type=float, default=1e-5, help='learning rate (default: 7e-4)')
+        '--lr', type=float, default=3e-4, help='learning rate (default: 7e-4)')
     parser.add_argument(
         '--eps',
         type=float,

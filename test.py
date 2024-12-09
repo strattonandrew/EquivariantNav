@@ -20,13 +20,13 @@ def main():
 	# the following parameters will be determined for each test run
 	parser = argparse.ArgumentParser('Parse configuration file')
 	# the model directory that we are testing
-	parser.add_argument('--model_dir', type=str, default='trained_models/GST_predictor_rand')
+	parser.add_argument('--model_dir', type=str, default='trained_models/global_pool_bn_more')
 	# render the environment or not
 	parser.add_argument('--visualize', default=True, action='store_true')
 	# if -1, it will run 500 different cases; if >=0, it will run the specified test case repeatedly
 	parser.add_argument('--test_case', type=int, default=-1)
 	# model weight file you want to test
-	parser.add_argument('--test_model', type=str, default='41665.pt')
+	parser.add_argument('--test_model', type=str, default='08000.pt')
 	# whether to save trajectories of episodes
 	parser.add_argument('--render_traj', default=False, action='store_true')
 	# whether to save slide show of episodes
@@ -133,6 +133,7 @@ def main():
 	env_config.render_traj = test_args.render_traj
 	env_config.save_slides = test_args.save_slides
 	env_config.save_path = os.path.join(test_args.model_dir, 'social_eval', test_args.test_model[:-3])
+	print("TEST ARGS ", env_name, algo_args.seed, algo_args.num_processes, algo_args.gamma, None, device, False, env_config, ax, config.env.use_wrapper)
 	envs = make_vec_envs(env_name, algo_args.seed, 1,
 						 algo_args.gamma, eval_dir, device, allow_early_resets=True,
 						 config=env_config, ax=ax, test_case=test_args.test_case, pretext_wrapper=config.env.use_wrapper)

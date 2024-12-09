@@ -36,6 +36,7 @@ class CrowdSimPred(CrowdSimVarNum):
 
     # set observation space and action space
     def set_robot(self, robot):
+        print("USING THE WRONG ONE")
         self.robot = robot
 
         # we set the max and min of action/observation space as inf

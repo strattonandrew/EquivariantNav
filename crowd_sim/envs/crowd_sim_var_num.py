@@ -9,6 +9,8 @@ from crowd_sim.envs.utils.info import *
 from crowd_sim.envs.utils.human import Human
 from crowd_sim.envs.utils.state import JointState
 
+USE_VEL = True
+
 
 class CrowdSimVarNum(CrowdSim):
     """
@@ -30,22 +32,33 @@ class CrowdSimVarNum(CrowdSim):
 
     def configure(self, config):
         """ read the config to the environment variables """
+        print("CONFIGURING SUPER")
         super(CrowdSimVarNum, self).configure(config)
+        #self.set_robot(rob_RL)
         self.action_type=config.action_space.kinematics
 
     # set observation space and action space
     def set_robot(self, robot):
+        print("WHY ARE WE NOT SETTING THIS")
         self.robot = robot
 
         # we set the max and min of action/observation space as inf
         # clip the action and observation as you need
 
+        if USE_VEL:
+            robot_size = 9
+            agent_size = 5
+        else:
+            robot_size = 7
+            agent_size = 2
+        print("ROBOT SIZE ", robot_size)
+
         d={}
         # robot node: px, py, r, gx, gy, v_pref, theta
-        d['robot_node'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,9,), dtype = np.float32)
+        d['robot_node'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,robot_size,), dtype = np.float32)
         # only consider all temporal edges (human_num+1) and spatial edges pointing to robot (human_num)
         d['temporal_edges'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1, 2,), dtype=np.float32)
-        d['spatial_edges'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.max_human_num, 5), dtype=np.float32)
+        d['spatial_edges'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.max_human_num, agent_size), dtype=np.float32)
         # number of humans detected at each timestep
         d['detected_human_num'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1, ), dtype=np.float32)
         # whether each human is visible to robot (ordered by human ID, should not be sorted)
@@ -248,14 +261,22 @@ class CrowdSimVarNum(CrowdSim):
         ob['temporal_edges'] = np.array([self.robot.vx, self.robot.vy])
 
         # ([relative px, relative py, disp_x, disp_y], human id)
-        all_spatial_edges = np.ones((self.max_human_num, 5)) * np.inf
+        if USE_VEL:
+            all_spatial_edges = np.ones((self.max_human_num, 5)) * np.inf
+        else:
+            all_spatial_edges = np.ones((self.max_human_num, 2)) * np.inf
 
         for i in range(self.human_num):
             if self.human_visibility[i]:
                 # vector pointing from human i to robot
-                relative_pos = np.array(
-                    [self.last_human_states[i, 0] - self.robot.px, self.last_human_states[i, 1] - self.robot.py, self.last_human_states[i, 2], self.last_human_states[i, 3], self.last_human_states[i, 4]])
-                all_spatial_edges[self.humans[i].id, :5] = relative_pos
+                if USE_VEL:
+                    relative_pos = np.array(
+                        [self.last_human_states[i, 0] - self.robot.px, self.last_human_states[i, 1] - self.robot.py, self.last_human_states[i, 2], self.last_human_states[i, 3], self.last_human_states[i, 4]])
+                    all_spatial_edges[self.humans[i].id, :5] = relative_pos
+                else:
+                    relative_pos = np.array(
+                        [self.last_human_states[i, 0] - self.robot.px, self.last_human_states[i, 1] - self.robot.py])
+                    all_spatial_edges[self.humans[i].id, :2] = relative_pos
 
         ob['visible_masks'] = np.zeros(self.max_human_num, dtype=np.bool)
         # sort all humans by distance (invisible humans will be in the end automatically)
@@ -465,6 +486,7 @@ class CrowdSimVarNum(CrowdSim):
     # danger_zone: how to define the personal_zone (if the robot intrudes into this zone, the info will be Danger)
     # circle (traditional) or future (based on true future traj of humans)
     def calc_reward(self, action, danger_zone='circle'):
+        #print("YES WE are using this")
         # collision detection
         dmin = float('inf')
 
@@ -496,10 +518,12 @@ class CrowdSimVarNum(CrowdSim):
 
         # use danger_zone to determine the condition for Danger
         if danger_zone == 'circle' or self.phase == 'train':
+            #print("IN IF")
             danger_cond = dmin < self.discomfort_dist
             min_danger_dist = 0
         else:
             # if the robot collides with future states, give it a collision penalty
+            #print("IN ELSE")
             relative_pos = self.human_future_traj[1:, :, :2] - np.array([self.robot.px, self.robot.py])
             relative_dist = np.linalg.norm(relative_pos, axis=-1)
 
@@ -542,6 +566,8 @@ class CrowdSimVarNum(CrowdSim):
             potential_cur = np.linalg.norm(
                 np.array([self.robot.px, self.robot.py]) - np.array(self.robot.get_goal_position()))
             reward = pot_factor * (-abs(potential_cur) - self.potential)
+            #reward = -1 * np.linalg.norm(np.array([self.robot.px, self.robot.py]) - np.array(self.robot.get_goal_position())) / 10
+            #print("POT REWARD: ", reward)
             self.potential = -abs(potential_cur)
 
             done = False

@@ -22,6 +22,7 @@ class CrowdSim(gym.Env):
     treat it as an abstract class, all other environments inherit from this one
     """
     def __init__(self):
+        print("INITTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT")
         """
         Movement simulation for n+1 agents
         Agent can either be human or robot.
@@ -86,6 +87,7 @@ class CrowdSim(gym.Env):
 
 
     def configure(self, config):
+        print("CONFIGUREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
         """ read the config to the environment variables """
 
         self.config = config
@@ -140,6 +142,7 @@ class CrowdSim(gym.Env):
 
         self.r = self.config.humans.radius
 
+        print("THIS FAR DOWN")
 
         # configure randomized goal changing of humans midway through episode
         self.random_goal_changing = config.humans.random_goal_changing
@@ -182,11 +185,16 @@ class CrowdSim(gym.Env):
 
         # set robot for this envs
         rob_RL = Robot(config, 'robot')
+        #print("ABOUT TO SET ROBOT I SWEAR")
         self.set_robot(rob_RL)
+        #print("DONE SETTING ROBOT")
+
+        return rob_RL
 
 
     def set_robot(self, robot):
-        raise NotImplementedError
+        print("SETTING WRONG ONE")
+        #raise NotImplementedError
 
 
     def generate_random_human_position(self, human_num):
